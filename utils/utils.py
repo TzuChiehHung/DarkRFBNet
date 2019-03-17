@@ -116,16 +116,16 @@ def parameters_info(module_list):
     '''Print a line-by-line parameters description of a PyTorch model'''
     n_p = sum(x.numel() for x in module_list.parameters())  # number parameters
     n_g = sum(x.numel() for x in module_list.parameters() if x.requires_grad)  # number gradients
-    print('\n' + '-'*110)
-    print('{:>5s} {:>30s} {:>9s} {:>12s} {:>20s} {:>12s} {:>12s}'.format('layer', 'name', 'gradient', 'parameters', 'shape', 'mu', 'sigma'))
-    print('='*110)
+    print('\n' + '-'*150)
+    print('{:>5s} {:>50s} {:>9s} {:>12s} {:>20s} {:>12s} {:>12s}'.format('layer', 'name', 'gradient', 'parameters', 'shape', 'mu', 'sigma'))
+    print('='*150)
     for i, (name, p) in enumerate(module_list.named_parameters()):
         name = name.replace('module_list.', '') #%5g %50s %9s %12g %20s %12.3g %12.3g
-        print('{:>5d} {:>30s} {:>9} {:>12} {:>20s} {:>12.3g} {:>12.3g}'.format(
+        print('{:>5d} {:>50s} {:>9} {:>12} {:>20s} {:>12.3g} {:>12.3g}'.format(
             i, name, str(p.requires_grad), p.numel(), str(list(p.shape)), p.mean(), p.std()))
-    print('-'*110)
+    print('-'*150)
     print('Model Summary: {:g} layers, {:,} parameters, {:,} gradients'.format(i + 1, n_p, n_g))
-    print('-'*110 + '\n')
+    print('-'*150 + '\n')
 
 def layers_info(module_defs):
     '''Print a line-by-line layers description of a model definition config'''

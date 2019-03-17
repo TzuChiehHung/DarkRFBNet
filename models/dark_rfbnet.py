@@ -5,11 +5,13 @@ from utils.parse_config import parse_model_cfg
 from models.modules import create_modules
 # from collections import defaultdict
 
-class DarkNet53(nn.Module):
-    '''DarkNet 53 backbone'''
+class DarkRFBNet(nn.Module):
+    '''
+    DarkNet backbone + RFB module
+    '''
 
     def __init__(self, cfg_path, img_size=416):
-        super(DarkNet53, self).__init__()
+        super(DarkRFBNet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg_path)
         self.module_defs[0]['cfg'] = cfg_path
@@ -24,7 +26,7 @@ class DarkNet53(nn.Module):
 
         for module_def, module in zip(self.module_defs, self.module_list):
             mtype = module_def['type']
-            if mtype in ['convolutional', 'upsample', 'maxpool']:
+            if mtype in ['convolutional', 'upsample', 'maxpool', 'rfb']:
                 x = module(x)
             elif mtype == 'route':
                 layer_i = [int(x) for x in module_def['layers'].split(',')]

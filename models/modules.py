@@ -66,12 +66,90 @@ def create_modules(module_defs):
             yolo_layer = YOLOLayer(anchors, nC, img_size, yolo_layer_count, cfg=hyperparams['cfg'])
             modules.add_module('yolo_%d' % i, yolo_layer)
             yolo_layer_count += 1
+        elif module_def['type'] == 'rfb':
+            filters = int(module_def['filters'])
+            stride = int(module_def['stride'])
+            scale = int(module_def['scale'])
+            visual = int(module_def['visual'])
+            bn = int(module_def['batch_normalize'])
+            modules.add_module('rfb_%d' % i, RFBLayer(output_filters[-1], filters,
+                stride=stride, scale=scale, visual=visual, bn=bn))
 
         # Register module list and number of output filters
         module_list.append(modules)
         output_filters.append(filters)
 
     return hyperparams, module_list
+
+class RFBLayer(nn.Module):
+    '''
+                                    padding and dilation
+    branch 0: 1x1, 3x3              (1)
+    branch 1: 1x1, 3x3, 3x3         (1 + visual)
+    branch 2: 1x1, 3x3, 3x3, 3x3    (1 + 2*visual)
+    concat: branch 0, 1, 2
+    conv: 1x1
+    shortcut conv: 1x1
+    sum: shortcut + scale * conv
+    LeakyReLU
+    '''
+
+    def __init__(self, in_channels, out_channels, stride=1, scale=1, visual=2, bn=False):
+        super(RFBLayer, self).__init__()
+        self.scale = scale
+
+        inter_channels = in_channels // 8
+
+        self.branch0 = nn.Sequential(
+            ConvLayer(in_channels, 2*inter_channels, kernel_size=1, stride=1, bn=bn),
+            ConvLayer(2*inter_channels, 2*inter_channels, kernel_size=3, stride=stride, padding=1, dilation=1, activation=False, bn=bn)
+        )
+        self.branch1 = nn.Sequential(
+            ConvLayer(in_channels, inter_channels, kernel_size=1, stride=1, bn=bn),
+            ConvLayer(inter_channels, 2*inter_channels, kernel_size=3, stride=stride, padding=1, dilation=1, bn=bn),
+            ConvLayer(2*inter_channels, 2*inter_channels, kernel_size=3, stride=1, padding=1+visual, dilation=1+visual, activation=False, bn=bn)
+        )
+        self.branch2 = nn.Sequential(
+            ConvLayer(in_channels, inter_channels, kernel_size=1, stride=1, bn=bn),
+            ConvLayer(inter_channels, (inter_channels//2)*3, kernel_size=3, stride=1, padding=1, dilation=1, bn=bn),
+            ConvLayer((inter_channels//2)*3, 2*inter_channels, kernel_size=3, stride=stride, padding=1, dilation=1, bn=bn),
+            ConvLayer(2*inter_channels, 2*inter_channels, kernel_size=3, stride=1, padding=1+2*visual, dilation=1+2*visual, activation=False, bn=bn)
+        )
+        self.concat_conv = ConvLayer(6*inter_channels, out_channels, kernel_size=1, stride=1, activation=False, bn=bn)
+        self.shortcut_conv = ConvLayer(in_channels, out_channels, kernel_size=1, stride=stride, activation=False, bn=bn)
+        self.activation = nn.LeakyReLU(inplace=False)
+
+    def forward(self, x):
+        x0 = self.branch0(x)
+        x1 = self.branch1(x)
+        x2 = self.branch2(x)
+
+        out = torch.cat((x0, x1, x2), 1)
+        out = self.concat_conv(out)
+        shortcut = self.shortcut_conv(x)
+        out = self.scale * out + shortcut
+        out = self.activation(out)
+
+        return out
+
+
+class ConvLayer(nn.Module):
+
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, activation=True, bn=False):
+        super(ConvLayer, self).__init__()
+
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias= not bn)
+        self.bn = nn.BatchNorm2d(out_channels) if bn else None  # use default setting
+        self.activation = nn.LeakyReLU() if activation else None # change ReLU to LeakyReLU, use default setting
+
+    def forward(self, x):
+        x = self.conv(x)
+        if self.bn is not None:
+            x = self.bn(x)
+        if self.activation is not None:
+            x = self.activation(x)
+        return x
 
 
 class YOLOLayer(nn.Module):

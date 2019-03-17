@@ -1,13 +1,14 @@
 from utils.parse_config import *
 from utils.utils  import *
 # from models.yolov3 import YOLOv3
-from models.darknet53 import DarkNet53
+from models.dark_rfbnet import DarkRFBNet
 
 # cfg = 'cfg/yolov3.cfg'
 # net = YOLOv3(cfg)
 
-cfg = 'cfg/darknet53.cfg'
-net = DarkNet53(cfg)
+# cfg = 'cfg/darknet53.cfg'
+cfg = 'cfg/dark53_rfbnet.cfg'
+net = DarkRFBNet(cfg)
 
 layers_info(net.module_defs)
 parameters_info(net.module_list)
